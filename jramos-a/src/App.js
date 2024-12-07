@@ -1,116 +1,126 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import './App.css';
 
 function App() {
+  const [connectedTime, setConnectedTime] = useState(0);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userFT, setUserFT] = useState(0);
+  const [tokenPrice, setTokenPrice] = useState(1);
+  const [equity, setEquity] = useState(0);
+  const [username, setUsername] = useState(''); // Track logged-in username
+
+  // Fetch the token price from the server
   useEffect(() => {
-    // Initialize staking platform variables
-    let balance = 100;
-    let staked = 0;
-    let rewards = 0;
-
-    // Create and append the main structure
-    const body = document.body;
-
-    // Header
-    const header = document.createElement('header');
-    const h1 = document.createElement('h1');
-    h1.textContent = '42 Staking Platform';
-    header.appendChild(h1);
-    body.appendChild(header);
-
-    // Main content
-    const main = document.createElement('main');
-    const stakingSection = document.createElement('section');
-    stakingSection.classList.add('staking-section');
-
-    // Balance display
-    const balanceDiv = document.createElement('div');
-    balanceDiv.classList.add('balance');
-    const balanceText = document.createElement('p');
-    balanceText.innerHTML = `Wallet Balance: <span id="balance">${balance}</span> Tokens`;
-    balanceDiv.appendChild(balanceText);
-
-    // Stake form
-    const stakeForm = document.createElement('form');
-    stakeForm.id = 'stake-form';
-    const stakeInput = document.createElement('input');
-    stakeInput.type = 'number';
-    stakeInput.id = 'stake-amount';
-    stakeInput.placeholder = 'Amount to Stake';
-    stakeInput.min = '1';
-    const stakeButton = document.createElement('button');
-    stakeButton.type = 'submit';
-    stakeButton.textContent = 'Stake';
-    stakeForm.append(stakeInput, stakeButton);
-
-    // Unstake form
-    const unstakeForm = document.createElement('form');
-    unstakeForm.id = 'unstake-form';
-    const unstakeInput = document.createElement('input');
-    unstakeInput.type = 'number';
-    unstakeInput.id = 'unstake-amount';
-    unstakeInput.placeholder = 'Amount to Unstake';
-    unstakeInput.min = '1';
-    const unstakeButton = document.createElement('button');
-    unstakeButton.type = 'submit';
-    unstakeButton.textContent = 'Unstake';
-    unstakeForm.append(unstakeInput, unstakeButton);
-
-    // Rewards display
-    const rewardsDiv = document.createElement('div');
-    rewardsDiv.classList.add('rewards');
-    const stakedText = document.createElement('p');
-    stakedText.innerHTML = `Staked Amount: <span id="staked">${staked}</span> Tokens`;
-    const rewardsText = document.createElement('p');
-    rewardsText.innerHTML = `Rewards: <span id="rewards">${rewards}</span> Tokens`;
-    rewardsDiv.append(stakedText, rewardsText);
-
-    // Append elements to the section
-    stakingSection.append(balanceDiv, stakeForm, unstakeForm, rewardsDiv);
-    main.appendChild(stakingSection);
-    body.appendChild(main);
-
-    // Footer
-    const footer = document.createElement('footer');
-    footer.innerHTML = `<p>Made with ❤️ and the 42 spirit</p>`;
-    body.appendChild(footer);
-
-    // Update the UI dynamically
-    const updateUI = () => {
-      document.getElementById('balance').textContent = balance;
-      document.getElementById('staked').textContent = staked;
-      document.getElementById('rewards').textContent = rewards.toFixed(2);
-    };
-
-    // Stake and Unstake functionality
-    stakeForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const amount = parseFloat(stakeInput.value);
-      if (amount > 0 && amount <= balance) {
-        balance -= amount;
-        staked += amount;
-        rewards += amount * 0.05; // 5% reward
-        updateUI();
-      }
-      stakeInput.value = '';
-    });
-
-    unstakeForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const amount = parseFloat(unstakeInput.value);
-      if (amount > 0 && amount <= staked) {
-        balance += amount;
-        staked -= amount;
-        updateUI();
-      }
-      unstakeInput.value = '';
-    });
-
-    // Initial UI update
-    updateUI();
+    fetch('http://localhost:3001/get-token-price')
+      .then((response) => response.json())
+      .then((data) => {
+        setTokenPrice(data.price);
+      })
+      .catch((err) => console.error('Error fetching token price:', err));
   }, []);
 
-  return null;
+  // Load user data from localStorage if available
+  useEffect(() => {
+    const storedUsername = localStorage.getItem('username');
+    const storedIsLoggedIn = JSON.parse(localStorage.getItem('isLoggedIn'));
+    const storedConnectedTime = parseInt(localStorage.getItem('connectedTime'), 10);
+    const storedUserFT = parseFloat(localStorage.getItem('userFT'));
+
+    if (storedIsLoggedIn) {
+      setIsLoggedIn(storedIsLoggedIn);
+      setUsername(storedUsername);
+      setConnectedTime(storedConnectedTime || 0);
+      setUserFT(storedUserFT || 0);
+    }
+  }, []);
+
+  // Start the connected time and earning tokens when the user is logged in
+  useEffect(() => {
+    let interval;
+
+    if (isLoggedIn) {
+      interval = setInterval(() => {
+        setConnectedTime((prev) => prev + 1); // Increment the connected time by 1 second
+        if (connectedTime % 60 === 0) { // Check if a minute has passed
+          setUserFT((prev) => prev + 1); // Increment FT tokens by 1 every minute
+        }
+      }, 1000); // Run every second, check for minute increment inside the interval
+    } else {
+      clearInterval(interval);
+    }
+
+    return () => clearInterval(interval);
+  }, [isLoggedIn, connectedTime]); // Make sure connectedTime is included as a dependency
+
+  useEffect(() => {
+    setEquity(userFT * tokenPrice); // Update equity based on FT tokens and token price
+  }, [userFT, tokenPrice]);
+
+  // Function to handle user creation and start earning tokens
+  const handleCreateUser = () => {
+    const autoGeneratedUsername = `user${Date.now()}`; // Generate a unique username
+
+    // Simulate user creation (no actual database here)
+    setIsLoggedIn(true);
+    setUsername(autoGeneratedUsername); // Set the new user's username
+    setConnectedTime(0); // Reset connected time
+    setUserFT(0); // Reset FT tokens
+
+    // Store the user data in localStorage
+    localStorage.setItem('isLoggedIn', JSON.stringify(true));
+    localStorage.setItem('username', autoGeneratedUsername);
+    localStorage.setItem('connectedTime', '0');
+    localStorage.setItem('userFT', '0');
+  };
+
+  // Store user data in localStorage whenever it changes
+  useEffect(() => {
+    if (isLoggedIn) {
+      localStorage.setItem('isLoggedIn', JSON.stringify(true));
+      localStorage.setItem('username', username);
+      localStorage.setItem('connectedTime', connectedTime.toString());
+      localStorage.setItem('userFT', userFT.toString());
+    } else {
+      // Clear localStorage when logged out
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('username');
+      localStorage.removeItem('connectedTime');
+      localStorage.removeItem('userFT');
+    }
+  }, [isLoggedIn, username, connectedTime, userFT]);
+
+  return (
+    <div className="app">
+      <header className="header">
+        <h1>42 Rewards Platform</h1>
+        {!isLoggedIn && (
+          <button className="login-button" onClick={handleCreateUser}>
+            Create User and Start Earning Tokens
+          </button>
+        )}
+
+        {isLoggedIn && <p>Welcome, {username}! You are earning FT tokens.</p>}
+      </header>
+
+      <main className="main">
+        <section className="rewards-section staking-section">
+          <div className="info-box">
+            <p>Connected Time: <span>{connectedTime}</span> seconds</p>
+          </div>
+          <div className="info-box">
+            <p>Accumulated FT Tokens: <span>{userFT.toFixed(1)}</span></p>
+          </div>
+          <div className="info-box">
+            <p>Account Equity: <span>${equity.toFixed(2)}</span></p>
+          </div>
+        </section>
+      </main>
+
+      <footer className="footer">
+        <p>Made by jramos-a</p>
+      </footer>
+    </div>
+  );
 }
 
 export default App;
